@@ -514,7 +514,7 @@ const server = createServer(async (req, res) => {
     const file = resolve(root, `.${path}`);
     if (!file.startsWith(root + '/') || !mime[extname(file)]) return json(res, 404, { error: 'Not found' });
     const bytes = await readFile(file);
-    res.writeHead(200, { 'Content-Type': mime[extname(file)] });
+    res.writeHead(200, { 'Content-Type': mime[extname(file)], 'Cache-Control': 'no-store' });
     res.end(bytes);
   } catch (error) {
     json(res, 500, { error: error.message || 'Something went wrong' });

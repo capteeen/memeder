@@ -185,7 +185,7 @@ async function loadFeed(force = false) {
   try {
     const data = await api(`/api/feed${force ? '?refresh=1' : ''}`);
     mergeTokens(data.tokens);
-    if (state.heldSwipe && sortedFeed()[0]?.address !== state.heldSwipe.address) state.heldSwipe = null;
+    if (state.heldSwipe && !sortedFeed().some(token => token.address === state.heldSwipe.address)) state.heldSwipe = null;
     state.updatedAt = data.updatedAt;
     state.stale = data.stale;
     state.error = '';
@@ -218,9 +218,13 @@ function updateChrome() {
 }
 function sortedFeed() {
   const visible = state.feed.filter(x => !state.seen.has(x.address));
-  return visible.sort((a, b) => state.filter === 'growing'
+  const sorted = visible.sort((a, b) => state.filter === 'growing'
     ? (Math.max(-100, Math.min(500, b.change1)) * Math.log10(b.volume24 + 10)) - (Math.max(-100, Math.min(500, a.change1)) * Math.log10(a.volume24 + 10))
     : b.volume24 - a.volume24);
+  if (!state.heldSwipe) return sorted;
+  const index = sorted.findIndex(token => token.address === state.heldSwipe.address);
+  if (index > 0) sorted.unshift(sorted.splice(index, 1)[0]);
+  return sorted;
 }
 function card(token, index = 0, position = 1) {
   const positive = token.change24 >= 0;
@@ -787,7 +791,7 @@ document.addEventListener('click', e => {
     return;
   }
   if (e.target.closest('#buyPrimary')) { if (quoteFresh()) executeBuy(); else getBuyQuote(); return; }
-  const view = e.target.closest('[data-view]');
+  const view = e.target.closest('a[data-view], button[data-view]');
   if (view) { e.preventDefault(); setView(view.dataset.view); return; }
   const filter = e.target.closest('[data-filter]');
   if (filter) { state.filter = filter.dataset.filter; state.heldSwipe = null; render(); return; }
