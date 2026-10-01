@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#0b090e" />
+  <title>Memeder — Find your next meme</title>
+  <meta name="description" content="Swipe through live Solana memecoins, save your early picks, and climb the meme hunter leaderboard." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Fredoka:wght@400;500;600;700&family=Nunito:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <a class="brand" href="#discover" data-view="discover" aria-label="Memeder home">
+        <span class="brand-mark"><img src="/mascot.jpg" alt="" /></span>
+        <span>meme<span class="brand-accent">der</span><small>THE MEME HUNT STARTS HERE</small></span>
+      </a>
+      <div class="sidebar-label">THE HUNT</div>
+      <nav class="side-nav" aria-label="Main navigation">
+        <button class="nav-item active" data-view="discover"><span class="nav-icon">✦</span> Discover <span class="nav-arrow">↗</span></button>
+        <button class="nav-item" data-view="watchlist"><span class="nav-icon">♡</span> My picks <span id="pickCount" class="nav-count">0</span></button>
+        <button class="nav-item" data-view="leaderboard"><span class="nav-icon">♛</span> Leaderboard</button>
+      </nav>
+      <div class="sidebar-bottom">
+        <div class="mission-card">
+          <div class="mission-top"><span class="mission-spark">✳</span><span>HUNTER STATUS</span></div>
+          <div class="mission-points"><strong id="sidebarPoints">0</strong><span>PTS</span></div>
+          <div class="mission-line"><span>Make the call early.</span><span>↗</span></div>
+        </div>
+        <button class="profile-button" id="profileButton" aria-label="Edit profile">
+          <span class="avatar">M</span><span class="profile-copy"><strong id="sidebarHandle">Meme Hunter</strong><small>EDIT PROFILE</small></span><span class="profile-dots">···</span>
+        </button>
+      </div>
+    </aside>
+
+    <div class="workspace">
+      <header class="topbar">
+        <div class="breadcrumb"><img class="mobile-brand" src="/mascot.jpg" alt="" /><span class="breadcrumb-dot"></span><span id="breadcrumbText">DISCOVER / THE DECK</span></div>
+        <div class="topbar-actions"><span class="network"><span></span>SOLANA MAINNET</span><button id="walletButton" class="wallet-button" type="button"><span class="wallet-dot"></span><span id="walletButtonText">CONNECT WALLET</span></button><button id="refreshButton" class="icon-button" aria-label="Refresh market data" title="Refresh market data">↻</button><button class="top-avatar" id="topAvatar" aria-label="Edit profile">M</button></div>
+      </header>
+      <main id="appMain" class="main-content"></main>
+      <footer class="footer"><span>MEMEDER <b>✳</b> FIND THE SIGNAL IN THE CHAOS</span><span>MARKET DATA BY <a href="https://dexscreener.com" target="_blank" rel="noopener noreferrer">DEX SCREENER ↗</a></span></footer>
+    </div>
+  </div>
+  <nav class="mobile-nav" aria-label="Mobile navigation">
+    <button class="active" data-view="discover"><span>✦</span>Discover</button>
+    <button data-view="watchlist"><span>♡</span>My picks</button>
+    <button data-view="leaderboard"><span>♛</span>Leaders</button>
+  </nav>
+  <dialog id="profileDialog" class="profile-dialog">
+    <form method="dialog" id="profileForm">
+      <button class="dialog-close" value="cancel" aria-label="Close">×</button>
+      <div class="dialog-kicker">YOUR HUNTER IDENTITY</div>
+      <h2>What should we call you?</h2>
+      <p>Your name shows up on the leaderboard for this app instance.</p>
+      <label for="handleInput">HUNTER NAME</label>
+      <input id="handleInput" name="handle" maxlength="22" autocomplete="nickname" required />
+      <button class="primary-button" value="save">SAVE PROFILE <span>↗</span></button>
+    </form>
+  </dialog>
+  <dialog id="walletDialog" class="trade-dialog wallet-dialog">
+    <button class="dialog-close" data-close-dialog aria-label="Close wallet dialog">×</button>
+    <div class="wallet-dialog-intro"><div><div class="trade-kicker">✳ YOUR WALLET, YOUR CALL</div><h2>Join the hunt.</h2></div><img src="/assets/mascot-wallet.png" alt="" /></div>
+    <p class="trade-lead">Connect a Solana wallet to buy coins you discover. Memeder never sees your private keys.</p>
+    <div id="walletChoices" class="wallet-choices"></div>
+    <p class="trade-footnote">Connecting only shares your public wallet address. Each buy still needs approval inside your wallet.</p>
+  </dialog>
+  <dialog id="buyDialog" class="trade-dialog buy-dialog">
+    <button class="dialog-close" data-close-dialog aria-label="Close buy dialog">×</button>
+    <div class="trade-kicker">♨ MEME MARKET</div>
+    <div id="buyContent"></div>
+  </dialog>
+  <dialog id="intelDialog" class="trade-dialog intel-dialog">
+    <button class="dialog-close" data-close-dialog aria-label="Close coin details">×</button>
+    <div class="trade-kicker">✳ COIN INTEL</div>
+    <div id="intelContent"></div>
+  </dialog>
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <script type="module" src="/app.js"></script>
+</body>
+</html>
