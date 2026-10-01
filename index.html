@@ -10,6 +10,13 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Fredoka:wght@400;500;600;700&family=Nunito:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/styles.css" />
+  <script>
+    window.__memederWallets = [];
+    window.addEventListener('wallet-standard:register-wallet', event => {
+      if (window.__memederOnWallet) window.__memederOnWallet(event);
+      else window.__memederWallets.push(event);
+    });
+  </script>
 </head>
 <body>
   <div class="app-shell">
@@ -64,9 +71,9 @@
   <dialog id="walletDialog" class="trade-dialog wallet-dialog">
     <button class="dialog-close" data-close-dialog aria-label="Close wallet dialog">×</button>
     <div class="wallet-dialog-intro"><div><div class="trade-kicker">✳ YOUR WALLET, YOUR CALL</div><h2>Join the hunt.</h2></div><img src="/assets/mascot-wallet.png" alt="" /></div>
-    <p class="trade-lead">Connect a Solana wallet to buy coins you discover. Memeder never sees your private keys.</p>
+    <p class="trade-lead">Connect a Solana wallet to buy and sell coins on Memeder. Your private keys stay in the wallet.</p>
     <div id="walletChoices" class="wallet-choices"></div>
-    <p class="trade-footnote">Connecting only shares your public wallet address. Each buy still needs approval inside your wallet.</p>
+    <p class="trade-footnote">Connecting only shares your public wallet address. Every buy or sell still needs approval inside your wallet.</p>
   </dialog>
   <dialog id="buyDialog" class="trade-dialog buy-dialog">
     <button class="dialog-close" data-close-dialog aria-label="Close buy dialog">×</button>
@@ -79,6 +86,6 @@
     <div id="intelContent"></div>
   </dialog>
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
-  <script type="module" src="/app.js"></script>
+  <script type="module" src="/client.js"></script>
 </body>
 </html>

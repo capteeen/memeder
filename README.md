@@ -4,7 +4,7 @@ A swipe-based Solana memecoin discovery app. The attached flame mascot is used i
 
 ## Run
 
-Requires Node.js 20+ and `curl`.
+Requires Node.js 20+.
 
 ```bash
 npm run dev

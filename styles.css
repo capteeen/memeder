@@ -19,7 +19,7 @@
 /* Discovery refinement */
 .swipe-card::before{content:'✳';position:absolute;top:17px;left:23px;font-size:185px;line-height:1;color:#f88d77;opacity:.055;pointer-events:none;transform:rotate(-18deg)}
 .swipe-card:not(.peek-card){animation:card-arrive .36s cubic-bezier(.2,.8,.2,1) both}
-@keyframes card-arrive{from{opacity:.55;transform:translateY(15px) scale(.975)}to{opacity:1;transform:translateY(0) scale(1)}}
+@keyframes card-arrive{from{opacity:.55}to{opacity:1}}
 .early-badge{position:absolute;z-index:3;bottom:13px;left:22px;white-space:nowrap;padding:7px 10px;border-radius:6px;border:1px solid #ffca79;background:#4b2630;color:#ffcc88;font:9px var(--mono);letter-spacing:.35px;box-shadow:0 8px 18px #0007;transform:rotate(-5deg)}
 .change-badge{display:grid;gap:3px;text-align:right;line-height:1.1}
 .change-badge small{font:8px var(--mono);letter-spacing:.8px;opacity:.72}
@@ -219,3 +219,37 @@ body{font-weight:600}
 .card-intel:focus-visible,.undo-strip button:focus-visible,.pick-intel:focus-visible,.pick-search:focus-within,.picks-tools select:focus-visible,.intel-dialog button:focus-visible,.intel-dialog a:focus-visible{outline:2px solid #ffbf89;outline-offset:2px}
 @media(max-width:760px){.card-top-right{gap:8px}.card-intel{width:25px;height:25px;font-size:12px}.undo-strip{margin-top:13px;padding:9px 11px;font-size:8px}.undo-strip + .pulse-banner{margin-top:23px}.picks-tools{flex-wrap:wrap;margin:0 0 20px}.pick-search{max-width:none;flex-basis:100%}.picks-tools>span{font-size:9px}.pick-intel{order:7;margin-left:auto}.pick-buy{margin-left:0}.intel-dialog{padding:21px 18px}.intel-head h2{font-size:28px}.intel-price strong{font-size:27px}}
 @media(max-width:400px){.intel-grid strong{font-size:18px}.intel-mint code{font-size:10px}.intel-actions a,.intel-actions button{font-size:11px}}
+
+.swipe-card.dragging{transition:none!important;animation:none!important;cursor:grabbing}
+.swipe-card.held-right{animation:none!important;transform:translate(104px,-8px) rotate(8deg)!important}
+.swipe-card.held-left{animation:none!important;transform:translate(-104px,-8px) rotate(-8deg)!important}
+.held-right .swipe-stamp.yep,.held-left .swipe-stamp.nope{opacity:1}
+.swipe-confirm{display:flex;align-items:center;justify-content:center;gap:10px;padding:18px 0 14px;flex-wrap:wrap}
+.swipe-confirm p{margin:0;flex-basis:100%;text-align:center;color:#d9c4ce;font-size:14px}
+.swipe-confirm p b{color:#fff}
+.swipe-confirm button{border-radius:13px;height:56px;min-width:148px;padding:0 16px;font:11px var(--mono);letter-spacing:.8px;cursor:pointer}
+#cancelSwipe{background:#211a21;border:1px solid #634a59;color:#f2a2af}
+#confirmSwipe{border:0;background:linear-gradient(110deg,#ffab5e,#fa4d64 58%,#f14486);color:#200d17}
+.deck-stage{height:528px}
+.card-actions-row,.pick-actions{display:flex;align-items:center;gap:8px}
+.card-actions-row{margin-top:12px}
+.card-actions-row button,.pick-actions button{position:relative;z-index:5}
+.card-actions-row button{flex:1}
+.token-trade,.token-sell{border-radius:7px;padding:7px 10px;font:700 10px var(--display);white-space:nowrap;cursor:pointer}
+.token-trade{border:1px solid #a56b78;background:#34212c;color:#ffd2b4}
+.token-sell{border:1px solid #6ea887;background:#1b2b24;color:#b7f0cf}
+.token-trade:hover,.token-sell:hover{transform:translateY(-2px)}
+.pick-actions{flex:none}
+.trade-tabs{display:flex;gap:6px;margin:0 0 14px;padding:4px;border:1px solid #5c3d4a;border-radius:10px;background:#1a1319}
+.trade-tabs button{flex:1;border:0;border-radius:7px;background:transparent;color:#b9a4ae;padding:9px;font:700 13px var(--display);cursor:pointer}
+.trade-tabs button.selected{background:#3a2431;color:#fff}
+.trade-tabs button[data-side="sell"].selected{background:#1d3329;color:#b9f3d0}
+.wallet-balance{margin:-2px 0 12px;color:#c8b0bc;font:10px var(--mono)}
+.wallet-status{margin:0 0 10px;color:#ffd0ad;font:10px var(--mono)}
+.wallet-install{display:flex;gap:8px;justify-content:center;margin-top:12px}
+.wallet-install a{border:1px solid #8d5b68;border-radius:8px;padding:8px 10px;font:10px var(--mono);color:#ffc7a4}
+.wallet-rescan{display:block;margin:12px auto 0;border:0;background:none;color:#e6b0b9;font:10px var(--mono);cursor:pointer;letter-spacing:.6px}
+.intel-actions button.trade{background:#34212e;color:#ffd0b4;border:1px solid #9b6a6a}
+.intel-actions button.sell{background:#1c3328;color:#c8f5da;border:1px solid #6ea887}
+@media(max-width:760px){.deck-stage{height:512px}.pick-actions{order:8;margin-left:auto;flex-wrap:wrap}.card-actions-row{gap:6px}}
+@media(max-width:480px){.deck-stage{height:500px}.token-trade,.token-sell,.card-actions-row .token-buy{font-size:9px;padding:6px 7px}}
