@@ -89,6 +89,7 @@ async function postJson(url, payload) {
 }
 
 const RPC_URLS = ['https://api.mainnet-beta.solana.com', 'https://solana-rpc.publicnode.com'];
+const TOKEN_2022 = 'TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb';
 async function solanaRpc(method, params) {
   let lastError = new Error('Solana RPC is unavailable');
   for (const url of RPC_URLS) {
@@ -101,20 +102,36 @@ async function solanaRpc(method, params) {
   throw lastError;
 }
 
-async function walletBalances(owner, mint) {
-  const [sol, tokens] = await Promise.all([
-    solanaRpc('getBalance', [owner]),
-    solanaRpc('getTokenAccountsByOwner', [owner, { mint }, { encoding: 'jsonParsed' }])
-  ]);
-  let raw = 0n;
-  let decimals = null;
-  for (const item of tokens?.value || []) {
-    const amount = item.account?.data?.parsed?.info?.tokenAmount;
-    if (!amount?.amount) continue;
-    raw += BigInt(amount.amount);
-    if (Number.isInteger(amount.decimals)) decimals = amount.decimals;
+function collectHoldings(items, mint, into) {
+  for (const item of items || []) {
+    if (item.pubkey && into.seen.has(item.pubkey)) continue;
+    if (item.pubkey) into.seen.add(item.pubkey);
+    const info = item.account?.data?.parsed?.info;
+    if (!info || (info.mint && info.mint !== mint)) continue;
+    const amount = info.tokenAmount;
+    if (!amount?.amount || !/^\d+$/.test(String(amount.amount))) continue;
+    into.raw += BigInt(amount.amount);
+    if (Number.isInteger(amount.decimals)) into.decimals = amount.decimals;
   }
-  return { solLamports: String(sol?.value ?? 0), tokenAmount: raw.toString(), decimals };
+}
+async function walletBalances(owner, mint) {
+  const sol = await solanaRpc('getBalance', [owner]);
+  const [classic, token2022] = await Promise.allSettled([
+    solanaRpc('getTokenAccountsByOwner', [owner, { mint }, { encoding: 'jsonParsed' }]),
+    solanaRpc('getProgramAccounts', [TOKEN_2022, {
+      encoding: 'jsonParsed',
+      filters: [
+        { memcmp: { offset: 0, bytes: mint } },
+        { memcmp: { offset: 32, bytes: owner } }
+      ]
+    }])
+  ]);
+  const holdings = { raw: 0n, decimals: null, seen: new Set() };
+  if (classic.status === 'fulfilled') collectHoldings(classic.value?.value, mint, holdings);
+  if (token2022.status === 'fulfilled') collectHoldings(Array.isArray(token2022.value) ? token2022.value : [], mint, holdings);
+  if (classic.status === 'rejected' && token2022.status === 'rejected') throw classic.reason;
+  if (token2022.status === 'rejected' && holdings.raw === 0n) throw token2022.reason;
+  return { solLamports: String(sol?.value ?? 0), tokenAmount: holdings.raw.toString(), decimals: holdings.decimals };
 }
 
 const decimalLookups = new Map();
@@ -416,6 +433,13 @@ const server = createServer(async (req, res) => {
       if (!order.transaction || !order.requestId || String(order.inAmount) !== String(amount) || !/^\d+$/.test(String(order.outAmount))) {
         return json(res, 502, { error: 'Jupiter could not build a swap for this coin. Try again later.' });
       }
+      if (balances && side === 'buy') {
+        const fees = ['signatureFeeLamports', 'prioritizationFeeLamports', 'rentFeeLamports']
+          .reduce((sum, key) => sum + (/^\d+$/.test(String(order[key] ?? '0')) ? BigInt(order[key]) : 0n), 0n);
+        if (BigInt(balances.solLamports) < BigInt(amount) + fees) {
+          return json(res, 400, { error: 'Not enough SOL to cover this swap and its network fees.' });
+        }
+      }
       const expiresAt = Date.now() + 60000;
       for (const [key, value] of pendingOrders) if (value.expiresAt < Date.now()) pendingOrders.delete(key);
       pendingOrders.set(order.requestId, { transaction: order.transaction, taker, outputMint: tokenMint, side, expiresAt });
@@ -435,18 +459,22 @@ const server = createServer(async (req, res) => {
     }
     if (url.pathname === '/api/buy/execute' && req.method === 'POST') {
       const input = await bodyJson(req);
-      const order = pendingOrders.get(String(input.requestId || ''));
-      if (!order || order.expiresAt < Date.now()) return json(res, 400, { error: 'Quote expired. Get a fresh quote before confirming.' });
-      if (typeof input.signedTransaction !== 'string' || !/^[A-Za-z0-9+/]+={0,2}$/.test(input.signedTransaction) || input.signedTransaction.length > 60000) {
+      const requestId = String(input.requestId || '');
+      const signedTransaction = input.signedTransaction;
+      if (typeof signedTransaction !== 'string' || !/^[A-Za-z0-9+/]+={0,2}$/.test(signedTransaction) || signedTransaction.length > 60000) {
         return json(res, 400, { error: 'Invalid signed transaction.' });
       }
-      const original = Buffer.from(order.transaction, 'base64');
-      const signed = Buffer.from(input.signedTransaction, 'base64');
-      if (original.length !== signed.length || !signedMessage(original).equals(signedMessage(signed))) {
-        return json(res, 400, { error: 'Signed transaction differs from the reviewed quote.' });
+      const order = pendingOrders.get(requestId);
+      if (order?.expiresAt < Date.now()) return json(res, 400, { error: 'Quote expired. Get a fresh quote before confirming.' });
+      if (order) {
+        const original = Buffer.from(order.transaction, 'base64');
+        const signed = Buffer.from(signedTransaction, 'base64');
+        if (original.length !== signed.length || !signedMessage(original).equals(signedMessage(signed))) {
+          return json(res, 400, { error: 'Signed transaction differs from the reviewed quote.' });
+        }
+        pendingOrders.delete(requestId);
       }
-      pendingOrders.delete(input.requestId);
-      const result = await jupiterRequest('/swap/v2/execute', { signedTransaction: input.signedTransaction, requestId: input.requestId });
+      const result = await jupiterRequest('/swap/v2/execute', { signedTransaction, requestId });
       return json(res, 200, { status: result.status, signature: result.signature || '', error: result.error || '' });
     }
     if (url.pathname === '/api/profile' && req.method === 'POST') {
@@ -520,4 +548,5 @@ const server = createServer(async (req, res) => {
     json(res, 500, { error: error.message || 'Something went wrong' });
   }
 });
-server.listen(port, '127.0.0.1', () => console.log(`Memeder running at http://localhost:${port}`));
+const host = process.env.HOST || (process.env.VERCEL ? '0.0.0.0' : '127.0.0.1');
+server.listen(port, host, () => console.log(`Memeder running at http://localhost:${port}`));

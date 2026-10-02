@@ -41,7 +41,7 @@
   #appMain[data-view="discover"] .section-toolbar{margin-bottom:11px}
   #appMain[data-view="discover"] .tabs button{padding:8px 12px;font-size:11px}
   #appMain[data-view="discover"] .feed-status{font-size:8px}
-  #appMain[data-view="discover"] .deck-stage{height:clamp(340px,calc(100dvh - 325px),480px);margin:0 4px 0 0}
+  #appMain[data-view="discover"] .deck-stage{height:clamp(280px,calc(100dvh - 390px),480px);margin:0 4px 0 0}
   #appMain[data-view="discover"] .swipe-card{border-radius:19px}
   #appMain[data-view="discover"] .card-top{padding:15px 16px}
   #appMain[data-view="discover"] .live-pill{padding:6px 8px;font-size:8px}
@@ -221,6 +221,7 @@ body{font-weight:600}
 @media(max-width:400px){.intel-grid strong{font-size:18px}.intel-mint code{font-size:10px}.intel-actions a,.intel-actions button{font-size:11px}}
 
 .swipe-card.dragging{transition:none!important;animation:none!important;cursor:grabbing}
+.swipe-card.fly-right,.swipe-card.fly-left{transition-duration:.16s}
 .swipe-card.held-right{animation:none!important;transform:translate(104px,-8px) rotate(8deg)!important}
 .swipe-card.held-left{animation:none!important;transform:translate(-104px,-8px) rotate(-8deg)!important}
 .held-right .swipe-stamp.yep,.held-left .swipe-stamp.nope{opacity:1}
@@ -229,8 +230,8 @@ body{font-weight:600}
 .swipe-confirm p b{color:#fff}
 .swipe-confirm button{border-radius:13px;height:56px;min-width:148px;padding:0 16px;font:11px var(--mono);letter-spacing:.8px;cursor:pointer}
 #cancelSwipe{background:#211a21;border:1px solid #634a59;color:#f2a2af}
-#confirmSwipe{border:0;background:linear-gradient(110deg,#ffab5e,#fa4d64 58%,#f14486);color:#200d17}
-.deck-stage{height:528px}
+#confirmSwipe{border:0;background:linear-gradient(110deg,#ffab5e,#fa4d64 58%,#f14486);color:#200d17}#confirmSwipe:disabled{opacity:.45;cursor:wait}
+.deck-stage{height:clamp(360px,calc(100dvh - 450px),528px)}
 .card-actions-row,.pick-actions{display:flex;align-items:center;gap:8px}
 .card-actions-row{margin-top:12px}
 .card-actions-row button,.pick-actions button{position:relative;z-index:5}

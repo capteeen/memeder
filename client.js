@@ -1,5 +1,5 @@
 const $ = selector => document.querySelector(selector);
-const state = { view: 'discover', filter: 'growing', feed: [], picks: [], seen: new Set(), user: null, loading: true, filling: false, refreshing: false, dragging: false, renderAfterSwipe: false, error: '', updatedAt: 0, stale: false, leaders: [], animating: false, undoing: false, lastSwipe: null, pickQuery: '', pickSort: 'newest', heldSwipe: null, blockSwipeClick: false };
+const state = { view: 'discover', filter: 'growing', feed: [], picks: [], seen: new Set(), user: null, loading: true, filling: false, refreshing: false, dragging: false, renderAfterSwipe: false, error: '', updatedAt: 0, stale: false, leaders: [], animating: false, undoing: false, lastSwipe: null, pickQuery: '', pickSort: 'newest', blockSwipeClick: false };
 const walletState = { wallet: null, account: null, wallets: new Set(), unsubscribe: null, connecting: false, error: '', legacySeen: new Set() };
 const buyState = { token: null, side: 'buy', amount: '0.05', quote: null, busy: false, error: '', signature: '', status: '', balance: null, balanceError: '', balanceRequest: 0 };
 const intelState = { token: null };
@@ -185,7 +185,6 @@ async function loadFeed(force = false) {
   try {
     const data = await api(`/api/feed${force ? '?refresh=1' : ''}`);
     mergeTokens(data.tokens);
-    if (state.heldSwipe && !sortedFeed().some(token => token.address === state.heldSwipe.address)) state.heldSwipe = null;
     state.updatedAt = data.updatedAt;
     state.stale = data.stale;
     state.error = '';
@@ -218,20 +217,14 @@ function updateChrome() {
 }
 function sortedFeed() {
   const visible = state.feed.filter(x => !state.seen.has(x.address));
-  const sorted = visible.sort((a, b) => state.filter === 'growing'
+  return visible.sort((a, b) => state.filter === 'growing'
     ? (Math.max(-100, Math.min(500, b.change1)) * Math.log10(b.volume24 + 10)) - (Math.max(-100, Math.min(500, a.change1)) * Math.log10(a.volume24 + 10))
     : b.volume24 - a.volume24);
-  if (!state.heldSwipe) return sorted;
-  const index = sorted.findIndex(token => token.address === state.heldSwipe.address);
-  if (index > 0) sorted.unshift(sorted.splice(index, 1)[0]);
-  return sorted;
 }
 function card(token, index = 0, position = 1) {
   const positive = token.change24 >= 0;
   const early = token.cap > 0 && token.cap < 1000000;
-  const held = !index && state.heldSwipe?.address === token.address;
-  const heldClass = held ? state.heldSwipe.direction === 'right' ? 'held-right' : 'held-left' : '';
-  return `<article class="swipe-card ${index ? 'peek-card' : ''} ${heldClass}" data-address="${esc(token.address)}" ${index ? 'aria-hidden="true"' : ''}>
+  return `<article class="swipe-card ${index ? 'peek-card' : ''}" data-address="${esc(token.address)}" ${index ? 'aria-hidden="true"' : ''}>
     <div class="card-glow"></div><div class="card-grid"></div>
     <div class="card-top"><span class="live-pill"><i></i> SOLANA / LIVE</span><div class="card-top-right"><span class="card-index">LIVE</span><button type="button" class="card-intel" data-intel="${esc(token.address)}" aria-label="View ${esc(token.name)} details" title="Coin details">i</button></div></div>
     <div class="card-art-wrap"><div class="card-art-halo"></div>${tokenArt(token, 'card-art')}${early ? '<span class="early-badge">✳ +15 EARLY BONUS</span>' : ''}</div>
@@ -262,7 +255,7 @@ function huntGuide() {
     <div class="guide-heading"><div><span>✳ THE HUNT, IN THREE MOVES</span><h2 id="huntGuideTitle">Find it. Pick it. <em>Flex it.</em></h2></div><span class="guide-heading-arrow">↘</span></div>
     <div class="guide-cards">
       <article class="guide-card scout"><span class="guide-step">01 / DISCOVER</span><img src="/assets/mascot-scout.png" alt="" loading="lazy"/><div><h3>Scout the deck</h3><p>Browse growing and popular Solana memes.</p></div></article>
-      <article class="guide-card heart"><span class="guide-step">02 / PICK</span><img src="/assets/mascot-heart.png" alt="" loading="lazy"/><div><h3>Trust your gut</h3><p>Slide right, then confirm, to save a find and earn points.</p></div></article>
+      <article class="guide-card heart"><span class="guide-step">02 / PICK</span><img src="/assets/mascot-heart.png" alt="" loading="lazy"/><div><h3>Trust your gut</h3><p>Slide right to save a find and earn points.</p></div></article>
       <article class="guide-card trophy"><span class="guide-step">03 / CLIMB</span><img src="/assets/mascot-trophy.png" alt="" loading="lazy"/><div><h3>Make your mark</h3><p>Spot early coins and climb the leaderboard.</p></div></article>
     </div>
   </section>`;
@@ -285,18 +278,13 @@ function undoBar() {
   return `<div class="undo-strip"><span><b>LAST CALL</b> ${state.lastSwipe.direction === 'right' ? 'PICKED' : 'PASSED'} $${esc(state.lastSwipe.symbol)}</span><button id="undoButton" type="button" ${state.undoing ? 'disabled' : ''}>↶ UNDO SWIPE</button></div>`;
 }
 function deckActions(token) {
-  const held = state.heldSwipe?.address === token.address ? state.heldSwipe : null;
-  if (held) {
-    const picking = held.direction === 'right';
-    return `<div class="swipe-confirm" role="group" aria-label="Confirm swipe"><p>${picking ? `Add <b>$${esc(token.symbol)}</b> to your picks?` : `Pass on <b>$${esc(token.symbol)}</b>?`}</p><button id="cancelSwipe" type="button">CANCEL</button><button id="confirmSwipe" type="button">${picking ? 'CONFIRM PICK' : 'CONFIRM PASS'}</button></div>`;
-  }
-  return `<div class="swipe-actions"><button id="passButton" class="swipe-button pass" type="button" aria-label="Pass on ${esc(token.name)}"><span>×</span><b>PASS</b></button><div class="swipe-hint">SLIDE, THEN CONFIRM<br><kbd>←</kbd> <kbd>→</kbd></div><button id="pickButton" class="swipe-button pick" type="button" aria-label="Pick ${esc(token.name)}"><span>♥</span><b>MAKE A PICK</b></button></div>`;
+  return `<div class="swipe-actions"><button id="passButton" class="swipe-button pass" type="button" aria-label="Pass on ${esc(token.name)}"><span>×</span><b>PASS</b></button><div class="swipe-hint">SLIDE LEFT OR RIGHT<br><kbd>←</kbd> <kbd>→</kbd></div><button id="pickButton" class="swipe-button pick" type="button" aria-label="Pick ${esc(token.name)}"><span>♥</span><b>MAKE A PICK</b></button></div>`;
 }
 function discover() {
   const sorted = sortedFeed(); const token = sorted[0];
   return `<section class="page-intro"><div><div class="eyebrow"><span class="eyebrow-line"></span> THE DISCOVERY DECK <span class="eyebrow-star">✳</span></div><h1>Find your next <em>meme.</em></h1><p>Swipe the chaos. Spot the early ones. Climb the ranks.</p></div><div class="intro-counter"><span>YOUR SCORE</span><strong>${Number(state.user?.points || 0).toLocaleString()} <small>PTS</small></strong><span class="counter-arrow">↗</span></div></section>
     <div class="section-toolbar"><div class="tabs" role="tablist" aria-label="Token feed"><button role="tab" aria-selected="${state.filter === 'growing'}" class="${state.filter === 'growing' ? 'selected' : ''}" data-filter="growing">✳ Growing</button><button role="tab" aria-selected="${state.filter === 'popular'}" class="${state.filter === 'popular' ? 'selected' : ''}" data-filter="popular">♨ Popular</button></div><div class="feed-status"><span></span>${feedLabel()}</div></div>
-    ${state.loading || (state.filling && !token) ? `<div class="loading-panel"><img class="state-art scout-art" src="/assets/mascot-scout.png" alt="" /><h2>Scanning the chain...</h2><p>Finding the next Solana tokens. The deck keeps going.</p></div>` : state.error && !token ? `<div class="empty-panel"><img class="state-art scout-art" src="/assets/mascot-scout.png" alt="" /><h2>Market feed unavailable</h2><p>${esc(state.error)}</p><button class="primary-button" id="retryButton">TRY AGAIN ↗</button></div>` : !token ? `<div class="empty-panel"><img class="state-art scout-art" src="/assets/mascot-scout.png" alt="" /><h2>Next wave incoming.</h2><p>New coins are lining up. This live feed does not end.</p><button class="primary-button" id="reloadDeck">KEEP HUNTING ↗</button></div>` : `<div class="discovery-layout"><div class="deck-column"><div class="deck-stage">${sorted[1] ? card(sorted[1], 1) : ''}${card(token, 0)}</div>${deckActions(token)}<div class="deck-footnote">+10 POINTS PER PICK <span>✳</span> +15 FOR EARLY PICKS UNDER $1M CAP · A SLIDE ONLY PREVIEWS</div></div>${insightPanel(token)}</div>`}${!state.loading && !(state.filling && !token) && !(state.error && !token) ? `${undoBar()}${marketPulse()}${huntGuide()}` : ''}`;
+    ${state.loading || (state.filling && !token) ? `<div class="loading-panel"><img class="state-art scout-art" src="/assets/mascot-scout.png" alt="" /><h2>Scanning the chain...</h2><p>Finding the next Solana tokens. The deck keeps going.</p></div>` : state.error && !token ? `<div class="empty-panel"><img class="state-art scout-art" src="/assets/mascot-scout.png" alt="" /><h2>Market feed unavailable</h2><p>${esc(state.error)}</p><button class="primary-button" id="retryButton">TRY AGAIN ↗</button></div>` : !token ? `<div class="empty-panel"><img class="state-art scout-art" src="/assets/mascot-scout.png" alt="" /><h2>Next wave incoming.</h2><p>New coins are lining up. This live feed does not end.</p><button class="primary-button" id="reloadDeck">KEEP HUNTING ↗</button></div>` : `<div class="discovery-layout"><div class="deck-column"><div class="deck-stage">${sorted[1] ? card(sorted[1], 1) : ''}${card(token, 0)}</div>${deckActions(token)}<div class="deck-footnote">+10 POINTS PER PICK <span>✳</span> +15 FOR EARLY PICKS UNDER $1M CAP</div></div>${insightPanel(token)}</div>`}${!state.loading && !(state.filling && !token) && !(state.error && !token) ? `${undoBar()}${marketPulse()}${huntGuide()}` : ''}`;
 }
 function watchlist() {
   const sorted = [...state.picks].sort((a, b) => state.pickSort === 'oldest' ? a.pickedAt - b.pickedAt
@@ -308,7 +296,7 @@ function watchlist() {
     const gain = current && pick.entryPrice ? (current.price / pick.entryPrice - 1) * 100 : null;
     return `<article class="pick-row" data-search="${esc(`${pick.name} ${pick.symbol} ${pick.address}`.toLowerCase())}"><span class="pick-rank">${String(i + 1).padStart(2, '0')}</span>${tokenArt(pick, 'pick-art')}<div class="pick-name"><strong>${esc(pick.name)}</strong><span>$${esc(pick.symbol)} · PICKED ${new Date(pick.pickedAt).toLocaleDateString()}</span></div><div class="pick-metric"><small>ENTRY CAP</small><strong>${money(pick.entryCap)}</strong></div><div class="pick-metric"><small>POINTS EARNED</small><strong class="hot">+${pick.points}</strong></div><div class="pick-metric"><small>SINCE PICK</small><strong class="${gain === null ? '' : gain >= 0 ? 'up-text' : 'down-text'}">${gain === null ? '—' : pct(gain)}</strong></div><button class="pick-intel" data-intel="${esc(pick.address)}" aria-label="View ${esc(pick.name)} details">INFO</button><div class="pick-actions">${tradeButtons(pick.address, pick.symbol)}</div><a class="row-link" href="https://dexscreener.com/solana/${esc(pick.address)}" target="_blank" rel="noopener noreferrer" aria-label="View ${esc(pick.name)} chart">↗</a></article>`;
   }).join('');
-  return `<section class="page-intro subpage"><div><div class="eyebrow"><span class="eyebrow-line"></span> YOUR CALLS</div><h1>My <em>picks.</em></h1><p>Every confirmed pick, with buy and sell once your wallet is connected.</p></div><div class="intro-counter"><span>TOTAL PICKS</span><strong>${state.picks.length}</strong><span class="counter-arrow">♡</span></div></section>${state.picks.length ? `<div class="picks-tools"><label class="pick-search"><span>⌕</span><input id="pickSearch" type="search" placeholder="Search your picks" aria-label="Search your picks" value="${esc(state.pickQuery)}" /></label><select id="pickSort" aria-label="Sort your picks"><option value="newest" ${state.pickSort === 'newest' ? 'selected' : ''}>Newest first</option><option value="oldest" ${state.pickSort === 'oldest' ? 'selected' : ''}>Oldest first</option><option value="points" ${state.pickSort === 'points' ? 'selected' : ''}>Most points</option></select><span id="pickResults">${visible.length} FOUND</span></div><div class="list-heading"><span>TOKEN</span><span>ENTRY CAP</span><span>POINTS</span><span>SINCE PICK*</span></div><div id="pickListBody" class="pick-list">${pickCards}</div><div id="pickNoResults" class="pick-no-results" ${visible.length ? 'hidden' : ''}>No picks match that search. Try another name or symbol.</div><p class="list-note">*Change is shown only while a token remains in the current feed. Points are awarded when picked; this prototype does not award later performance bonuses.</p>` : `<div class="empty-panel picks-empty"><img class="state-art heart-art" src="/assets/mascot-heart.png" alt="" /><h2>No picks yet.</h2><p>Your favorite finds will appear here after a right swipe.</p><button class="primary-button" data-view="discover">START SWIPING ↗</button></div>`}`;
+  return `<section class="page-intro subpage"><div><div class="eyebrow"><span class="eyebrow-line"></span> YOUR CALLS</div><h1>My <em>picks.</em></h1><p>Every pick, with buy and sell once your wallet is connected.</p></div><div class="intro-counter"><span>TOTAL PICKS</span><strong>${state.picks.length}</strong><span class="counter-arrow">♡</span></div></section>${state.picks.length ? `<div class="picks-tools"><label class="pick-search"><span>⌕</span><input id="pickSearch" type="search" placeholder="Search your picks" aria-label="Search your picks" value="${esc(state.pickQuery)}" /></label><select id="pickSort" aria-label="Sort your picks"><option value="newest" ${state.pickSort === 'newest' ? 'selected' : ''}>Newest first</option><option value="oldest" ${state.pickSort === 'oldest' ? 'selected' : ''}>Oldest first</option><option value="points" ${state.pickSort === 'points' ? 'selected' : ''}>Most points</option></select><span id="pickResults">${visible.length} FOUND</span></div><div class="list-heading"><span>TOKEN</span><span>ENTRY CAP</span><span>POINTS</span><span>SINCE PICK*</span></div><div id="pickListBody" class="pick-list">${pickCards}</div><div id="pickNoResults" class="pick-no-results" ${visible.length ? 'hidden' : ''}>No picks match that search. Try another name or symbol.</div><p class="list-note">*Change is shown only while a token remains in the current feed. Points are awarded when picked; this prototype does not award later performance bonuses.</p>` : `<div class="empty-panel picks-empty"><img class="state-art heart-art" src="/assets/mascot-heart.png" alt="" /><h2>No picks yet.</h2><p>Your favorite finds will appear here after a right swipe.</p><button class="primary-button" data-view="discover">START SWIPING ↗</button></div>`}`;
 }
 function leaderboard() {
   const leaders = state.leaders;
@@ -322,27 +310,17 @@ function render() {
   updateChrome();
   if (state.view === 'discover' && !state.loading && !state.error) attachDrag();
 }
-function setView(view) { state.heldSwipe = null; state.view = view; render(); if (view === 'leaderboard') loadLeaderboard(); if (view === 'discover') ensureDeck(); window.scrollTo({ top: 0, behavior: 'smooth' }); }
-function holdSwipe(direction) {
-  if (state.animating || state.view !== 'discover') return;
-  const token = sortedFeed()[0];
-  if (!token) return;
-  state.dragging = false;
-  state.renderAfterSwipe = false;
-  state.heldSwipe = { direction, address: token.address, armedAt: performance.now() };
-  render();
-}
+function setView(view) { state.view = view; render(); if (view === 'leaderboard') loadLeaderboard(); if (view === 'discover') ensureDeck(); window.scrollTo({ top: 0, behavior: 'smooth' }); }
 async function swipe(direction) {
   if (state.animating || state.view !== 'discover') return;
   const token = sortedFeed()[0]; if (!token) return;
-  if (state.heldSwipe && state.heldSwipe.address !== token.address) { state.heldSwipe = null; render(); return; }
-  state.heldSwipe = null;
+  state.dragging = false;
   state.animating = true;
   const cardEl = $('.swipe-card:not(.peek-card)');
   cardEl?.classList.add(direction === 'right' ? 'fly-right' : 'fly-left');
   try {
     const result = await api('/api/swipe', { method: 'POST', body: JSON.stringify({ userId, address: token.address, direction }) });
-    await new Promise(resolve => setTimeout(resolve, 330));
+    await new Promise(resolve => setTimeout(resolve, 180));
     state.seen.add(token.address);
     state.user = result.user;
     state.lastSwipe = result.swipe;
@@ -375,7 +353,7 @@ function attachDrag() {
   detachDrag();
   detachDrag = () => {};
   const cardEl = $('.swipe-card:not(.peek-card)');
-  if (!cardEl || state.heldSwipe?.address === cardEl.dataset.address) return;
+  if (!cardEl) return;
   let pointer = null;
   const resetCard = () => {
     cardEl.classList.remove('dragging', 'drag-right', 'drag-left');
@@ -397,9 +375,9 @@ function attachDrag() {
       state.blockSwipeClick = true;
       setTimeout(() => { state.blockSwipeClick = false; }, 400);
     }
-    const commitDistance = Math.max(150, cardEl.clientWidth * 0.34);
+    const commitDistance = Math.max(72, cardEl.clientWidth * 0.18);
     const armed = commit && tracked.locked && Math.abs(tracked.dx) >= commitDistance && Math.abs(tracked.dx) > Math.abs(tracked.dy);
-    if (armed) { holdSwipe(tracked.dx > 0 ? 'right' : 'left'); return; }
+    if (armed) { swipe(tracked.dx > 0 ? 'right' : 'left'); return; }
     if (state.renderAfterSwipe) { state.renderAfterSwipe = false; render(); }
   }
   function onUp(event) { if (pointer && event.pointerId === pointer.id) finish(true); }
@@ -692,7 +670,7 @@ async function getBuyQuote() {
   const amount = $('#tradeAmount').value.trim();
   const selling = buyState.side === 'sell';
   if (selling) {
-    if (!/^(?:0|[1-9]\d*)(?:\.\d{1,9})?$/.test(amount) || Number(amount) <= 0) {
+    if (!/^(?:0|[1-9]\d{0,20})(?:\.\d{1,18})?$/.test(amount) || Number(amount) <= 0) {
       buyState.error = 'Enter how many tokens you want to sell.'; renderBuy(); return;
     }
   } else if (!/^(?:0|[1-9]\d{0,1})(?:\.\d{1,9})?$/.test(amount) || Number(amount) < .001 || Number(amount) > 10) {
@@ -794,16 +772,10 @@ document.addEventListener('click', e => {
   const view = e.target.closest('a[data-view], button[data-view]');
   if (view) { e.preventDefault(); setView(view.dataset.view); return; }
   const filter = e.target.closest('[data-filter]');
-  if (filter) { state.filter = filter.dataset.filter; state.heldSwipe = null; render(); return; }
-  if (state.blockSwipeClick && e.target.closest('#confirmSwipe, #cancelSwipe, #passButton, #pickButton')) return;
-  if (e.target.closest('#cancelSwipe')) { state.heldSwipe = null; render(); return; }
-  if (e.target.closest('#confirmSwipe')) {
-    if (!state.heldSwipe || performance.now() - state.heldSwipe.armedAt < 450) return;
-    swipe(state.heldSwipe.direction);
-    return;
-  }
-  if (e.target.closest('#passButton')) { holdSwipe('left'); return; }
-  if (e.target.closest('#pickButton')) { holdSwipe('right'); return; }
+  if (filter) { state.filter = filter.dataset.filter; render(); return; }
+  if (state.blockSwipeClick && e.target.closest('#passButton, #pickButton')) return;
+  if (e.target.closest('#passButton')) { swipe('left'); return; }
+  if (e.target.closest('#pickButton')) { swipe('right'); return; }
   if (e.target.closest('#retryButton') || e.target.closest('#reloadDeck') || e.target.closest('#refreshButton')) loadFeed(true);
   if (e.target.closest('#profileButton, #topAvatar')) { $('#handleInput').value = state.user?.handle || ''; $('#profileDialog').showModal(); }
 });
@@ -822,7 +794,7 @@ document.addEventListener('input', e => {
   const button = $('#buyPrimary'); if (button) button.textContent = 'GET LIVE QUOTE ↗';
   const receive = $('.receive-field strong'); if (receive) receive.textContent = '—';
   const details = $('.quote-details'); if (details) details.remove();
-  const expiry = $('.quote-expiry'); if (expiry) expiry.textContent = 'Get a live Jupiter quote to see the estimated tokens and fees.';
+  const expiry = $('.quote-expiry'); if (expiry) expiry.textContent = buyState.side === 'sell' ? 'Get a live Jupiter quote to see the estimated SOL and fees.' : 'Get a live Jupiter quote to see the estimated tokens and fees.';
 });
 document.addEventListener('change', e => {
   if (e.target.id === 'pickSort') { state.pickSort = e.target.value; render(); }
@@ -830,14 +802,8 @@ document.addEventListener('change', e => {
 document.addEventListener('keydown', e => {
   if ($('#profileDialog').open || $('#walletDialog').open || $('#buyDialog').open || $('#intelDialog').open || /INPUT|TEXTAREA/.test(document.activeElement.tagName)) return;
   if (e.repeat) return;
-  if (e.key === 'Escape' && state.heldSwipe) { state.heldSwipe = null; render(); return; }
-  if (e.key === 'Enter' && state.heldSwipe) {
-    if (performance.now() - state.heldSwipe.armedAt < 450) return;
-    swipe(state.heldSwipe.direction);
-    return;
-  }
-  if (e.key === 'ArrowLeft') holdSwipe('left');
-  if (e.key === 'ArrowRight') holdSwipe('right');
+  if (e.key === 'ArrowLeft') swipe('left');
+  if (e.key === 'ArrowRight') swipe('right');
 });
 $('#buyDialog').addEventListener('close', () => { buyState.token = null; buyState.quote = null; });
 $('#intelDialog').addEventListener('close', () => { intelState.token = null; });
