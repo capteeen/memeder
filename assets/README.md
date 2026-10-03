@@ -1,4 +1,4 @@
-# Memeder in-app illustrations
+# Date in-app illustrations
 
 These transparent PNG assets were generated with the built-in image generation tool using `../mascot.jpg` as the character and style reference. The original mascot remains the app logo.
 

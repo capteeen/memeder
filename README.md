@@ -1,4 +1,4 @@
-# Memeder
+# Date
 
 A swipe-based Solana memecoin discovery app. The attached flame mascot is used in the interface.
 

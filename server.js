@@ -290,7 +290,7 @@ async function mergeGecko(kind, pageKey) {
   const page = stream[pageKey];
   const payload = await getJson(
     `https://api.geckoterminal.com/api/v2/networks/solana/${kind}?page=${page}&include=base_token`,
-    ['Accept: application/json', 'User-Agent: Memeder/1.0']
+    ['Accept: application/json', 'User-Agent: Date/1.0']
   );
   stream.lastGeckoAt = Date.now();
   const pools = Array.isArray(payload.data) ? payload.data : [];
@@ -549,4 +549,4 @@ const server = createServer(async (req, res) => {
   }
 });
 const host = process.env.HOST || (process.env.VERCEL ? '0.0.0.0' : '127.0.0.1');
-server.listen(port, host, () => console.log(`Memeder running at http://localhost:${port}`));
+server.listen(port, host, () => console.log(`Date running at http://localhost:${port}`));

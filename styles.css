@@ -221,7 +221,7 @@ body{font-weight:600}
 @media(max-width:400px){.intel-grid strong{font-size:18px}.intel-mint code{font-size:10px}.intel-actions a,.intel-actions button{font-size:11px}}
 
 .swipe-card.dragging{transition:none!important;animation:none!important;cursor:grabbing}
-.swipe-card.fly-right,.swipe-card.fly-left{transition-duration:.16s}
+.swipe-card.fly-right,.swipe-card.fly-left{animation:none!important;transition-duration:.16s}
 .swipe-card.held-right{animation:none!important;transform:translate(104px,-8px) rotate(8deg)!important}
 .swipe-card.held-left{animation:none!important;transform:translate(-104px,-8px) rotate(-8deg)!important}
 .held-right .swipe-stamp.yep,.held-left .swipe-stamp.nope{opacity:1}

@@ -4,26 +4,26 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="theme-color" content="#0b090e" />
-  <title>Memeder — Find your next meme</title>
+  <title>Date — Find your next meme</title>
   <meta name="description" content="Swipe through live Solana memecoins, save your early picks, and climb the meme hunter leaderboard." />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Fredoka:wght@400;500;600;700&family=Nunito:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/styles.css" />
   <script>
-    window.__memederWallets = [];
+    window.__dateWallets = [];
     window.addEventListener('wallet-standard:register-wallet', event => {
-      if (window.__memederOnWallet) window.__memederOnWallet(event);
-      else window.__memederWallets.push(event);
+      if (window.__dateOnWallet) window.__dateOnWallet(event);
+      else window.__dateWallets.push(event);
     });
   </script>
 </head>
 <body>
   <div class="app-shell">
     <aside class="sidebar">
-      <a class="brand" href="#discover" data-view="discover" aria-label="Memeder home">
+      <a class="brand" href="#discover" data-view="discover" aria-label="Date home">
         <span class="brand-mark"><img src="/mascot.jpg" alt="" /></span>
-        <span>meme<span class="brand-accent">der</span><small>THE MEME HUNT STARTS HERE</small></span>
+        <span>da<span class="brand-accent">te</span><small>THE MEME HUNT STARTS HERE</small></span>
       </a>
       <div class="sidebar-label">THE HUNT</div>
       <nav class="side-nav" aria-label="Main navigation">
@@ -49,7 +49,7 @@
         <div class="topbar-actions"><span class="network"><span></span>SOLANA MAINNET</span><button id="walletButton" class="wallet-button" type="button"><span class="wallet-dot"></span><span id="walletButtonText">CONNECT WALLET</span></button><button id="refreshButton" class="icon-button" aria-label="Refresh market data" title="Refresh market data">↻</button><button class="top-avatar" id="topAvatar" aria-label="Edit profile">M</button></div>
       </header>
       <main id="appMain" class="main-content"></main>
-      <footer class="footer"><span>MEMEDER <b>✳</b> FIND THE SIGNAL IN THE CHAOS</span><span>MARKET DATA BY <a href="https://dexscreener.com" target="_blank" rel="noopener noreferrer">DEX SCREENER ↗</a></span></footer>
+      <footer class="footer"><span>DATE <b>✳</b> FIND THE SIGNAL IN THE CHAOS</span><span>MARKET DATA BY <a href="https://dexscreener.com" target="_blank" rel="noopener noreferrer">DEX SCREENER ↗</a></span></footer>
     </div>
   </div>
   <nav class="mobile-nav" aria-label="Mobile navigation">
@@ -71,7 +71,7 @@
   <dialog id="walletDialog" class="trade-dialog wallet-dialog">
     <button class="dialog-close" data-close-dialog aria-label="Close wallet dialog">×</button>
     <div class="wallet-dialog-intro"><div><div class="trade-kicker">✳ YOUR WALLET, YOUR CALL</div><h2>Join the hunt.</h2></div><img src="/assets/mascot-wallet.png" alt="" /></div>
-    <p class="trade-lead">Connect a Solana wallet to buy and sell coins on Memeder. Your private keys stay in the wallet.</p>
+    <p class="trade-lead">Connect a Solana wallet to buy and sell coins on Date. Your private keys stay in the wallet.</p>
     <div id="walletChoices" class="wallet-choices"></div>
     <p class="trade-footnote">Connecting only shares your public wallet address. Every buy or sell still needs approval inside your wallet.</p>
   </dialog>

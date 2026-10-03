@@ -3,9 +3,17 @@ const state = { view: 'discover', filter: 'growing', feed: [], picks: [], seen: 
 const walletState = { wallet: null, account: null, wallets: new Set(), unsubscribe: null, connecting: false, error: '', legacySeen: new Set() };
 const buyState = { token: null, side: 'buy', amount: '0.05', quote: null, busy: false, error: '', signature: '', status: '', balance: null, balanceError: '', balanceRequest: 0 };
 const intelState = { token: null };
-const storedId = localStorage.getItem('memeder-id');
+function migratedStorageValue(key, previousKey) {
+  const value = localStorage.getItem(key) || localStorage.getItem(previousKey);
+  if (value) localStorage.setItem(key, value);
+  localStorage.removeItem(previousKey);
+  return value;
+}
+const storedId = migratedStorageValue('date-id', 'memeder-id');
+const storedHandle = migratedStorageValue('date-handle', 'memeder-handle');
+migratedStorageValue('date-wallet', 'memeder-wallet');
 const userId = storedId && /^[a-f0-9-]{36}$/.test(storedId) ? storedId : crypto.randomUUID();
-localStorage.setItem('memeder-id', userId);
+localStorage.setItem('date-id', userId);
 
 function esc(value) { return String(value ?? '').replace(/[&<>"']/g, x => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[x]); }
 function safeUrl(value) { try { const url = new URL(value); return url.protocol === 'https:' ? url.href : ''; } catch { return ''; } }
@@ -101,7 +109,7 @@ function toast(message) {
   clearTimeout(toast.timer); toast.timer = setTimeout(() => el.classList.remove('show'), 3500);
 }
 async function loadProfile() {
-  const data = await api('/api/profile', { method: 'POST', body: JSON.stringify({ id: userId, handle: localStorage.getItem('memeder-handle') || undefined }) });
+  const data = await api('/api/profile', { method: 'POST', body: JSON.stringify({ id: userId, handle: storedHandle || undefined }) });
   state.user = data.user;
   state.picks = data.picks;
   state.seen = new Set(data.seen);
@@ -196,7 +204,8 @@ async function loadFeed(force = false) {
   state.loading = false;
   state.refreshing = false;
   state.filling = sortedFeed().length < 8;
-  render();
+  if (state.view === 'discover') presentFeed();
+  else render();
   if (sortedFeed().length < 8) ensureDeck();
 }
 async function loadLeaderboard() {
@@ -313,10 +322,11 @@ function render() {
 function setView(view) { state.view = view; render(); if (view === 'leaderboard') loadLeaderboard(); if (view === 'discover') ensureDeck(); window.scrollTo({ top: 0, behavior: 'smooth' }); }
 async function swipe(direction) {
   if (state.animating || state.view !== 'discover') return;
-  const token = sortedFeed()[0]; if (!token) return;
+  const cardEl = $('.swipe-card:not(.peek-card)');
+  const token = state.feed.find(item => item.address === cardEl?.dataset.address);
+  if (!token) return;
   state.dragging = false;
   state.animating = true;
-  const cardEl = $('.swipe-card:not(.peek-card)');
   cardEl?.classList.add(direction === 'right' ? 'fly-right' : 'fly-left');
   try {
     const result = await api('/api/swipe', { method: 'POST', body: JSON.stringify({ userId, address: token.address, direction }) });
@@ -327,7 +337,7 @@ async function swipe(direction) {
     if (direction === 'right') { state.picks.unshift(result.swipe); toast(`+${result.swipe.points} points! ${token.symbol} is in your picks. Buy or sell it there anytime.`); }
     else toast(`${token.symbol} passed. On to the next one.`);
     render();
-  } catch (error) { cardEl?.classList.remove('fly-right', 'fly-left'); toast(error.message); }
+  } catch (error) { cardEl?.classList.remove('fly-right', 'fly-left'); if (cardEl) cardEl.style.transform = ''; toast(error.message); }
   state.animating = false;
   if (state.renderAfterSwipe) { state.renderAfterSwipe = false; render(); }
   if (sortedFeed().length < 8) ensureDeck();
@@ -366,26 +376,38 @@ function attachDrag() {
     state.dragging = false;
   };
   detachDrag = () => { stopTracking(); };
-  function finish(commit) {
+  function finish(commit, event) {
     if (!pointer) return;
     const tracked = pointer;
+    if (event) {
+      tracked.dx = event.clientX - tracked.x;
+      tracked.dy = event.clientY - tracked.y;
+      if (Math.abs(tracked.dx) >= 16 && Math.abs(tracked.dx) > Math.abs(tracked.dy)) tracked.locked = true;
+    }
     stopTracking();
-    resetCard();
     if (Math.abs(tracked.dx) > 8) {
       state.blockSwipeClick = true;
       setTimeout(() => { state.blockSwipeClick = false; }, 400);
     }
     const commitDistance = Math.max(72, cardEl.clientWidth * 0.18);
     const armed = commit && tracked.locked && Math.abs(tracked.dx) >= commitDistance && Math.abs(tracked.dx) > Math.abs(tracked.dy);
-    if (armed) { swipe(tracked.dx > 0 ? 'right' : 'left'); return; }
+    if (armed) {
+      cardEl.classList.remove('dragging', 'drag-right', 'drag-left');
+      swipe(tracked.dx > 0 ? 'right' : 'left');
+      return;
+    }
+    resetCard();
+    try { cardEl.releasePointerCapture(tracked.id); } catch { /* capture may already be gone */ }
     if (state.renderAfterSwipe) { state.renderAfterSwipe = false; render(); }
   }
-  function onUp(event) { if (pointer && event.pointerId === pointer.id) finish(true); }
+  function onUp(event) { if (pointer && event.pointerId === pointer.id) finish(true, event); }
   function onCancel(event) { if (pointer && event.pointerId === pointer.id) finish(false); }
   cardEl.addEventListener('pointerdown', event => {
     if (state.animating || event.target.closest('a, button')) return;
     if (event.pointerType === 'mouse' && event.button !== 0) return;
     pointer = { id: event.pointerId, x: event.clientX, y: event.clientY, dx: 0, dy: 0, locked: false };
+    state.dragging = true;
+    try { cardEl.setPointerCapture(event.pointerId); } catch { /* pointer may already be gone */ }
     window.addEventListener('pointerup', onUp, true);
     window.addEventListener('pointercancel', onCancel, true);
   });
@@ -397,9 +419,7 @@ function attachDrag() {
       if (Math.abs(pointer.dy) > 16 && Math.abs(pointer.dy) > Math.abs(pointer.dx)) { finish(false); return; }
       if (Math.abs(pointer.dx) < 16 || Math.abs(pointer.dx) <= Math.abs(pointer.dy)) return;
       pointer.locked = true;
-      state.dragging = true;
       cardEl.classList.add('dragging');
-      try { cardEl.setPointerCapture(event.pointerId); } catch { /* pointer may already be gone */ }
     }
     cardEl.style.transform = `translate(${pointer.dx}px, 0px) rotate(${pointer.dx / 28}deg)`;
     cardEl.classList.toggle('drag-right', pointer.dx > 72);
@@ -478,7 +498,7 @@ function adoptWallet(wallet, account) {
   walletState.account = account;
   walletState.connecting = false;
   walletState.error = '';
-  localStorage.setItem('memeder-wallet', wallet.name);
+  localStorage.setItem('date-wallet', wallet.name);
   const off = wallet.features['standard:events']?.on?.('change', event => {
     if (!event.accounts) return;
     const next = solanaAccount(event.accounts);
@@ -497,7 +517,7 @@ function adoptWallet(wallet, account) {
 }
 async function restoreWallet(wallet) {
   if (walletState.account || walletState.connecting || !isSolanaWallet(wallet)) return;
-  if (localStorage.getItem('memeder-wallet') !== wallet.name) return;
+  if (localStorage.getItem('date-wallet') !== wallet.name) return;
   walletState.connecting = true;
   updateChrome();
   try {
@@ -513,7 +533,7 @@ async function restoreWallet(wallet) {
 function clearWallet() {
   walletState.unsubscribe?.(); walletState.unsubscribe = null;
   walletState.wallet = null; walletState.account = null; walletState.connecting = false;
-  localStorage.removeItem('memeder-wallet');
+  localStorage.removeItem('date-wallet');
   buyState.quote = null; buyState.balance = null;
   updateChrome(); renderWalletChoices();
   if ($('#buyDialog').open) renderBuy();
@@ -813,15 +833,15 @@ $('#profileForm').addEventListener('submit', async e => {
   const handle = $('#handleInput').value.trim(); if (!handle) return;
   try {
     const data = await api('/api/profile', { method: 'POST', body: JSON.stringify({ id: userId, handle }) });
-    state.user = data.user; state.lastSwipe = data.lastSwipe; localStorage.setItem('memeder-handle', data.user.handle); $('#profileDialog').close(); render(); if (state.view === 'leaderboard') loadLeaderboard(); toast('Hunter profile updated.');
+    state.user = data.user; state.lastSwipe = data.lastSwipe; localStorage.setItem('date-handle', data.user.handle); $('#profileDialog').close(); render(); if (state.view === 'leaderboard') loadLeaderboard(); toast('Hunter profile updated.');
   } catch (error) { toast(error.message); }
 });
 
-window.__memederOnWallet = event => {
+window.__dateOnWallet = event => {
   if (typeof event.detail === 'function') event.detail({ register: registerWallet });
 };
-for (const event of window.__memederWallets || []) window.__memederOnWallet(event);
-window.__memederWallets = [];
+for (const event of window.__dateWallets || []) window.__dateOnWallet(event);
+window.__dateWallets = [];
 refreshWallets();
 let walletScans = 0;
 const walletScan = setInterval(() => { scanLegacyWallets(); if (++walletScans > 20) clearInterval(walletScan); }, 500);
