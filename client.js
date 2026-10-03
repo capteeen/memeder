@@ -1,5 +1,5 @@
 const $ = selector => document.querySelector(selector);
-const state = { view: 'discover', filter: 'growing', feed: [], picks: [], seen: new Set(), user: null, loading: true, filling: false, refreshing: false, dragging: false, renderAfterSwipe: false, error: '', updatedAt: 0, stale: false, leaders: [], animating: false, undoing: false, lastSwipe: null, pickQuery: '', pickSort: 'newest', blockSwipeClick: false };
+const state = { view: 'discover', filter: 'growing', feed: [], picks: [], swipes: [], seen: new Set(), user: null, loading: true, filling: false, refreshing: false, dragging: false, renderAfterSwipe: false, error: '', updatedAt: 0, stale: false, leaders: [], animating: false, undoing: false, lastSwipe: null, pickQuery: '', pickSort: 'newest', blockSwipeClick: false };
 const walletState = { wallet: null, account: null, wallets: new Set(), unsubscribe: null, connecting: false, error: '', legacySeen: new Set() };
 const buyState = { token: null, side: 'buy', amount: '0.05', quote: null, busy: false, error: '', signature: '', status: '', balance: null, balanceError: '', balanceRequest: 0 };
 const intelState = { token: null };
@@ -14,6 +14,25 @@ const storedHandle = migratedStorageValue('date-handle', 'memeder-handle');
 migratedStorageValue('date-wallet', 'memeder-wallet');
 const userId = storedId && /^[a-f0-9-]{36}$/.test(storedId) ? storedId : crypto.randomUUID();
 localStorage.setItem('date-id', userId);
+const profileKey = `date-profile-${userId}`;
+
+function storedProfile() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(profileKey) || 'null');
+    return saved?.id === userId && Array.isArray(saved.swipes) ? saved : null;
+  } catch { return null; }
+}
+function setSwipeHistory(swipes) {
+  state.swipes = swipes;
+  state.seen = new Set(swipes.map(swipe => swipe.address));
+  state.picks = swipes.filter(swipe => swipe.direction === 'right').reverse();
+  state.lastSwipe = swipes.at(-1) || null;
+  if (state.user) state.user.points = swipes.reduce((points, swipe) => points + Number(swipe.points || 0) + Number(swipe.breakoutBonus || 0), 0);
+}
+function rememberProfile() {
+  try { localStorage.setItem(profileKey, JSON.stringify({ id: userId, user: state.user, swipes: state.swipes })); }
+  catch { toast('Could not save your picks in this browser.'); }
+}
 
 function esc(value) { return String(value ?? '').replace(/[&<>"']/g, x => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[x]); }
 function safeUrl(value) { try { const url = new URL(value); return url.protocol === 'https:' ? url.href : ''; } catch { return ''; } }
@@ -110,10 +129,16 @@ function toast(message) {
 }
 async function loadProfile() {
   const data = await api('/api/profile', { method: 'POST', body: JSON.stringify({ id: userId, handle: storedHandle || undefined }) });
-  state.user = data.user;
-  state.picks = data.picks;
-  state.seen = new Set(data.seen);
-  state.lastSwipe = data.lastSwipe;
+  const saved = storedProfile();
+  state.user = { ...data.user, ...(saved?.user || {}) };
+  setSwipeHistory(saved?.swipes || data.swipes || []);
+  rememberProfile();
+  render();
+}
+function restoreProfile() {
+  const saved = storedProfile();
+  state.user = saved?.user || { id: userId, handle: storedHandle || 'Meme Hunter', points: 0, joinedAt: Date.now() };
+  setSwipeHistory(saved?.swipes || []);
   render();
 }
 function mergeTokens(tokens) {
@@ -331,10 +356,10 @@ async function swipe(direction) {
   try {
     const result = await api('/api/swipe', { method: 'POST', body: JSON.stringify({ userId, address: token.address, direction }) });
     await new Promise(resolve => setTimeout(resolve, 180));
-    state.seen.add(token.address);
-    state.user = result.user;
-    state.lastSwipe = result.swipe;
-    if (direction === 'right') { state.picks.unshift(result.swipe); toast(`+${result.swipe.points} points! ${token.symbol} is in your picks. Buy or sell it there anytime.`); }
+    state.user = { ...result.user, handle: state.user?.handle || result.user.handle };
+    setSwipeHistory([...state.swipes, result.swipe]);
+    rememberProfile();
+    if (direction === 'right') toast(`+${result.swipe.points} points! ${token.symbol} is in your picks. Buy or sell it there anytime.`);
     else toast(`${token.symbol} passed. On to the next one.`);
     render();
   } catch (error) { cardEl?.classList.remove('fly-right', 'fly-left'); if (cardEl) cardEl.style.transform = ''; toast(error.message); }
@@ -346,15 +371,13 @@ async function undoSwipe() {
   if (!state.lastSwipe || state.animating || state.undoing) return;
   state.undoing = true;
   const address = state.lastSwipe.address;
+  const removed = state.lastSwipe;
   render();
-  try {
-    const result = await api('/api/swipe/undo', { method: 'POST', body: JSON.stringify({ userId, address }) });
-    state.user = result.user;
-    state.lastSwipe = result.lastSwipe;
-    state.seen.delete(result.removed.address);
-    if (result.removed.direction === 'right') state.picks = state.picks.filter(pick => pick.address !== result.removed.address);
-    toast(`Last swipe undone. $${result.removed.symbol} is back in the deck.`);
-  } catch (error) { toast(error.message); }
+  try { await api('/api/swipe/undo', { method: 'POST', body: JSON.stringify({ userId, address }) }); }
+  catch { /* browser history remains authoritative if the server instance changed */ }
+  setSwipeHistory(state.swipes.slice(0, -1));
+  rememberProfile();
+  toast(`Last swipe undone. $${removed.symbol} is back in the deck.`);
   state.undoing = false;
   render();
 }
@@ -833,7 +856,7 @@ $('#profileForm').addEventListener('submit', async e => {
   const handle = $('#handleInput').value.trim(); if (!handle) return;
   try {
     const data = await api('/api/profile', { method: 'POST', body: JSON.stringify({ id: userId, handle }) });
-    state.user = data.user; state.lastSwipe = data.lastSwipe; localStorage.setItem('date-handle', data.user.handle); $('#profileDialog').close(); render(); if (state.view === 'leaderboard') loadLeaderboard(); toast('Hunter profile updated.');
+    state.user = { ...data.user, points: state.user?.points || 0 }; localStorage.setItem('date-handle', data.user.handle); rememberProfile(); $('#profileDialog').close(); render(); if (state.view === 'leaderboard') loadLeaderboard(); toast('Hunter profile updated.');
   } catch (error) { toast(error.message); }
 });
 
@@ -847,4 +870,4 @@ let walletScans = 0;
 const walletScan = setInterval(() => { scanLegacyWallets(); if (++walletScans > 20) clearInterval(walletScan); }, 500);
 render();
 renderWalletChoices();
-loadProfile().catch(error => toast(error.message)).then(() => loadFeed());
+loadProfile().catch(() => restoreProfile()).then(() => loadFeed());

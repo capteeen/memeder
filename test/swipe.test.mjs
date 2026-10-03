@@ -25,7 +25,7 @@ function setup() {
     setPointerCapture: () => {}
   };
   const calls = [];
-  const state = { view: 'discover', feed: [{ address: 'visible', symbol: 'VIS' }, { address: 'new-first', symbol: 'NEW' }], seen: new Set(), picks: [], dragging: false, animating: false, renderAfterSwipe: false, blockSwipeClick: false };
+  const state = { view: 'discover', feed: [{ address: 'visible', symbol: 'VIS' }, { address: 'new-first', symbol: 'NEW' }], seen: new Set(), picks: [], swipes: [], dragging: false, animating: false, renderAfterSwipe: false, blockSwipeClick: false };
   const context = vm.createContext({
     state,
     userId: 'test-user',
@@ -38,6 +38,8 @@ function setup() {
     render: () => {},
     toast: () => {},
     ensureDeck: () => {},
+    rememberProfile: () => {},
+    setSwipeHistory: swipes => { state.swipes = swipes; state.seen = new Set(swipes.map(swipe => swipe.address)); },
     window: {
       addEventListener: (name, handler) => listeners.set(`window:${name}`, handler),
       removeEventListener: name => listeners.delete(`window:${name}`)

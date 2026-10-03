@@ -6,6 +6,7 @@ const root = process.cwd();
 const port = Number(process.env.PORT) || 3000;
 const dbPath = process.env.VERCEL ? join('/tmp', 'hunters.json') : join(root, 'data', 'hunters.json');
 const addressPattern = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
+const profileIdPattern = /^[a-f0-9-]{36}$/;
 const SOL_MINT = 'So11111111111111111111111111111111111111112';
 const USDC_MINT = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v';
 const USDT_MINT = 'Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB';
@@ -351,7 +352,10 @@ async function fetchFeed(force = false) {
 
 async function readDb() {
   try { return JSON.parse(await readFile(dbPath, 'utf8')); }
-  catch { return { users: {}, swipes: [] }; }
+  catch (error) {
+    if (error.code === 'ENOENT') return { users: {}, swipes: [] };
+    throw error;
+  }
 }
 async function saveDb(db) {
   await mkdir(dirname(dbPath), { recursive: true });
@@ -370,6 +374,10 @@ async function bodyJson(req) {
   return JSON.parse(text || '{}');
 }
 function publicUser(user) { return { id: user.id, handle: user.handle, points: user.points, joinedAt: user.joinedAt }; }
+function ensureSwipeUser(db, id) {
+  if (!profileIdPattern.test(id)) return null;
+  return db.users[id] ||= { id, handle: 'Meme Hunter', points: 0, joinedAt: Date.now() };
+}
 
 const server = createServer(async (req, res) => {
   try {
@@ -480,7 +488,7 @@ const server = createServer(async (req, res) => {
     if (url.pathname === '/api/profile' && req.method === 'POST') {
       const input = await bodyJson(req);
       const id = String(input.id || '');
-      if (!/^[a-f0-9-]{36}$/.test(id)) return json(res, 400, { error: 'Invalid profile ID' });
+      if (!profileIdPattern.test(id)) return json(res, 400, { error: 'Invalid profile ID' });
       const db = await readDb();
       const handle = String(input.handle || db.users[id]?.handle || 'Meme Hunter').trim().replace(/[^\w .-]/g, '').slice(0, 22) || 'Meme Hunter';
       db.users[id] = db.users[id] || { id, handle, points: 0, joinedAt: Date.now() };
@@ -488,6 +496,7 @@ const server = createServer(async (req, res) => {
       await saveDb(db);
       return json(res, 200, {
         user: publicUser(db.users[id]),
+        swipes: db.swipes.filter(x => x.userId === id),
         picks: db.swipes.filter(x => x.userId === id && x.direction === 'right').reverse(),
         seen: db.swipes.filter(x => x.userId === id).map(x => x.address),
         lastSwipe: db.swipes.findLast(x => x.userId === id) || null
@@ -510,8 +519,10 @@ const server = createServer(async (req, res) => {
     if (url.pathname === '/api/swipe' && req.method === 'POST') {
       const input = await bodyJson(req);
       const db = await readDb();
-      const user = db.users[String(input.userId || '')];
-      if (!user || !['left', 'right'].includes(input.direction)) return json(res, 400, { error: 'Invalid swipe' });
+      const id = String(input.userId || '');
+      if (!['left', 'right'].includes(input.direction)) return json(res, 400, { error: 'Invalid swipe' });
+      const user = ensureSwipeUser(db, id);
+      if (!user) return json(res, 400, { error: 'Invalid swipe' });
       let token = findListed(String(input.address || ''));
       if (!token) {
         await withFeedLock(() => fetchFeed(false));
